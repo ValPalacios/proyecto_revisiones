@@ -32,7 +32,7 @@ class RevisionRespuesta(BaseModel):
 # --- BASE DE DATOS ---
 def crear_tabla():
     if not user or not password:
-        print("⚠️ ERROR: No se encontraron las variables en el archivo .env")
+        print("ERROR: No se encontraron las variables en el archivo .env")
         return
     try:
         with psycopg.connect(DATABASE_URL) as conn:
@@ -47,9 +47,9 @@ def crear_tabla():
                     );
                 """)
                 conn.commit()
-        print("✅ Tabla 'revisiones' verificada/creada con éxito en PostgreSQL.")
+        print("Tabla 'revisiones' verificada/creada con éxito en PostgreSQL.")
     except Exception as e:
-        print(f"❌ Error al conectar con la base de datos: {e}")
+        print(f"Error al conectar con la base de datos: {e}")
 
 @app.on_event("startup")
 def startup_event():
@@ -103,5 +103,113 @@ def listar_revisiones():
                         "fecha_creacion": f[4].isoformat()
                     } for f in filas
                 ]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+# --- NUEVOS ENDPOINTS ---
+
+@app.get("/revisiones/{id}", response_model=RevisionRespuesta)
+def obtener_revision(id: int):
+    if id <= 0:
+        raise HTTPException(status_code=422, detail="El ID debe ser un entero positivo")
+        
+    try:
+        with psycopg.connect(DATABASE_URL) as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT id, titulo, nota, estado, fecha_creacion FROM revisiones WHERE id = %s;", (id,))
+                fila = cur.fetchone()
+                
+                if fila is None:
+                    raise HTTPException(status_code=404, detail="Revisión no encontrada")
+                    
+                return {
+                    "id": fila[0],
+                    "titulo": fila[1],
+                    "nota": fila[2],
+                    "estado": fila[3],
+                    "fecha_creacion": fila[4].isoformat()
+                }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.patch("/revisiones/{id}", response_model=RevisionRespuesta)
+def actualizar_revision(id: int, revision: dict):
+    if id <= 0:
+        raise HTTPException(status_code=422, detail="El ID debe ser un entero positivo")
+        
+    # Validación manual básica para actualizaciones parciales
+    campos_actualizar = []
+    valores = []
+    
+    if "titulo" in revision:
+        titulo = revision["titulo"]
+        if not isinstance(titulo, str) or len(titulo.strip()) < 1 or len(titulo.strip()) > 120:
+            raise HTTPException(status_code=422, detail="Título inválido")
+        campos_actualizar.append("titulo = %s")
+        valores.append(titulo.strip())
+        
+    if "nota" in revision:
+        nota = revision["nota"]
+        if not isinstance(nota, str) or len(nota) > 2000:
+            raise HTTPException(status_code=422, detail="Nota inválida")
+        campos_actualizar.append("nota = %s")
+        valores.append(nota)
+        
+    if "estado" in revision:
+        estado = revision["estado"]
+        if estado not in ["pendiente", "revisada"]:
+            raise HTTPException(status_code=422, detail="Estado inválido")
+        campos_actualizar.append("estado = %s")
+        valores.append(estado)
+        
+    # Si no se envió nada, devolvemos el registro tal cual (PATCH vacío)
+    if not campos_actualizar:
+        return obtener_revision(id)
+        
+    valores.append(id)
+    
+    try:
+        with psycopg.connect(DATABASE_URL) as conn:
+            with conn.cursor() as cur:
+                sql = f"UPDATE revisiones SET {', '.join(campos_actualizar)} WHERE id = %s RETURNING id, titulo, nota, estado, fecha_creacion;"
+                cur.execute(sql, tuple(valores))
+                fila = cur.fetchone()
+                conn.commit()
+                
+                if fila is None:
+                    raise HTTPException(status_code=404, detail="Revisión no encontrada")
+                    
+                return {
+                    "id": fila[0],
+                    "titulo": fila[1],
+                    "nota": fila[2],
+                    "estado": fila[3],
+                    "fecha_creacion": fila[4].isoformat()
+                }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.delete("/revisiones/{id}", status_code=204)
+def eliminar_revision(id: int):
+    if id <= 0:
+        raise HTTPException(status_code=422, detail="El ID debe ser un entero positivo")
+        
+    try:
+        with psycopg.connect(DATABASE_URL) as conn:
+            with conn.cursor() as cur:
+                cur.execute("DELETE FROM revisiones WHERE id = %s RETURNING id;", (id,))
+                fila = cur.fetchone()
+                conn.commit()
+                
+                if fila is None:
+                    raise HTTPException(status_code=404, detail="Revisión no encontrada")
+                    
+                return None
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
