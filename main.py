@@ -11,13 +11,6 @@ app = FastAPI()
 # Si no existe, lanzará un error al intentar conectar 
 DATABASE_URL = os.getenv("DATABASE_URL")
 
-user = os.getenv("POSTGRES_USER")
-password = os.getenv("POSTGRES_PASSWORD")
-dbname = os.getenv("POSTGRES_DB")
-host = os.getenv("QA_DB_HOST")
-port = os.getenv("QA_DB_PORT")
-DATABASE_URL = f"postgresql://{user}:{password}@{host}:{port}/{dbname}"
-
 # --- MODELOS DE VALIDACIÓN (Pydantic) ---
 class RevisionCrear(BaseModel):
     titulo: str = Field(..., min_length=1, max_length=120)
@@ -33,12 +26,24 @@ class RevisionRespuesta(BaseModel):
 
 # --- BASE DE DATOS ---
 def crear_tabla():
-    if not user or not password:
-        print("ERROR: No se encontraron las variables en el archivo .env")
+    if not DATABASE_URL:
+        print("ERROR: La variable DATABASE_URL no está configurada.")
         return
     try:
         with psycopg.connect(DATABASE_URL) as conn:
             with conn.cursor() as cur:
+                # 1. Tabla de llamadas (Nueva)
+                cur.execute("""
+                    CREATE TABLE IF NOT EXISTS llamadas (
+                        id SERIAL PRIMARY KEY,
+                        nombre_archivo VARCHAR(200) NOT NULL,
+                        duracion_seg INTEGER NOT NULL CHECK (duracion_seg BETWEEN 1 AND 86400),
+                        fecha_llamada TIMESTAMP WITH TIME ZONE NOT NULL,
+                        fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+                    );
+                """)
+                
+                # 2. Tabla de revisiones (Tuya original)
                 cur.execute("""
                     CREATE TABLE IF NOT EXISTS revisiones (
                         id SERIAL PRIMARY KEY,
@@ -48,10 +53,17 @@ def crear_tabla():
                         fecha_creacion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
                     );
                 """)
+
+                # 3. Añadir relación a revisiones (Aditivo, sin borrar datos)
+                # Usamos IF NOT EXISTS para que si ya lo aplicamos, no falle al reiniciar.
+                cur.execute("""
+                    ALTER TABLE revisiones 
+                    ADD COLUMN IF NOT EXISTS llamada_id INTEGER REFERENCES llamadas(id) ON DELETE RESTRICT;
+                """)
                 conn.commit()
-        print("Tabla 'revisiones' verificada/creada con éxito en PostgreSQL.")
+        print("Tablas y relaciones verificadas/creadas con éxito.")
     except Exception as e:
-        print(f"Error al conectar con la base de datos: {e}")
+        print(f"Error al conectar o crear las tablas: {e}")
 
 @app.on_event("startup")
 def startup_event():
