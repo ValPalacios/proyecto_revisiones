@@ -1,13 +1,15 @@
 import os
 from fastapi import FastAPI, HTTPException, status
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, List
+from datetime import datetime, timezone
 import psycopg
-from dotenv import load_dotenv
-
-load_dotenv()
 
 app = FastAPI()
+
+# Leemos directamente la variable de entorno. 
+# Si no existe, lanzará un error al intentar conectar 
+DATABASE_URL = os.getenv("DATABASE_URL")
 
 user = os.getenv("POSTGRES_USER")
 password = os.getenv("POSTGRES_PASSWORD")
