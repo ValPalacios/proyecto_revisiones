@@ -4,6 +4,7 @@ from pydantic import BaseModel, Field, ConfigDict
 from typing import Optional, List
 from datetime import datetime
 import psycopg
+from fastapi.staticfiles import StaticFiles
 
 app = FastAPI()
 
@@ -388,3 +389,5 @@ def eliminar_revision(id: int):
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+app.mount("/ui", StaticFiles(directory="frontend", html=True), name="frontend")
