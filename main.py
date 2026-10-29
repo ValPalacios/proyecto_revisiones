@@ -1,8 +1,8 @@
 import os
-from fastapi import FastAPI, HTTPException, status
-from pydantic import BaseModel, Field, ConfigDict
+from fastapi import FastAPI, HTTPException, status, Path
+from pydantic import BaseModel, Field, ConfigDict, field_validator
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 import psycopg
 from fastapi.staticfiles import StaticFiles
 
@@ -20,6 +20,23 @@ class LlamadaCrear(BaseModel):
     duracion_seg: int = Field(..., strict=True, ge=1, le=86400)
     fecha_llamada: datetime
 
+    # --- CORRECCIÓN: Validar que la fecha tenga zona horaria y convertir a UTC ---
+    @field_validator('fecha_llamada')
+    @classmethod
+    def validar_fecha_con_zona(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            raise ValueError("La fecha debe incluir zona horaria (ej. -06:00 o Z)")
+        return v.astimezone(timezone.utc)
+    
+    # --- CORRECCIÓN: Validar que nombre_archivo no quede vacío tras strip ---
+    @field_validator('nombre_archivo')
+    @classmethod
+    def validar_nombre_archivo(cls, v: str) -> str:
+        v_limpio = v.strip()
+        if not v_limpio:
+            raise ValueError("El nombre del archivo no puede estar vacío ni contener solo espacios")
+        return v_limpio
+
 class LlamadaRespuesta(BaseModel):
     id: int
     nombre_archivo: str
@@ -33,18 +50,63 @@ class LlamadaReemplazar(BaseModel):
     duracion_seg: int = Field(..., strict=True, ge=1, le=86400)
     fecha_llamada: datetime
 
+    @field_validator('fecha_llamada')
+    @classmethod
+    def validar_fecha_con_zona(cls, v: datetime) -> datetime:
+        if v.tzinfo is None:
+            raise ValueError("La fecha debe incluir zona horaria (ej. -06:00 o Z)")
+        return v.astimezone(timezone.utc)
+
+    @field_validator('nombre_archivo')
+    @classmethod
+    def validar_nombre_archivo(cls, v: str) -> str:
+        v_limpio = v.strip()
+        if not v_limpio:
+            raise ValueError("El nombre del archivo no puede estar vacío ni contener solo espacios")
+        return v_limpio
+
 class LlamadaActualizarParcial(BaseModel):
     model_config = ConfigDict(extra='forbid')
     nombre_archivo: Optional[str] = Field(default=None, min_length=1, max_length=200)
     duracion_seg: Optional[int] = Field(default=None, strict=True, ge=1, le=86400)
     fecha_llamada: Optional[datetime] = None
 
+    @field_validator('fecha_llamada')
+    @classmethod
+    def validar_fecha_con_zona(cls, v: Optional[datetime]) -> Optional[datetime]:
+        if v is None:
+            return v
+        if v.tzinfo is None:
+            raise ValueError("La fecha debe incluir zona horaria (ej. -06:00 o Z)")
+        return v.astimezone(timezone.utc)
+
+    @field_validator('nombre_archivo')
+    @classmethod
+    def validar_nombre_archivo(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v_limpio = v.strip()
+        if not v_limpio:
+            raise ValueError("El nombre del archivo no puede estar vacío ni contener solo espacios")
+        return v_limpio
+
 # 2. Modelos para Revisiones (Actualizados)
 class RevisionCrear(BaseModel):
+    # --- CORRECCIÓN: Añadido extra='forbid' ---
+    model_config = ConfigDict(extra='forbid')
     titulo: str = Field(..., min_length=1, max_length=120)
     nota: Optional[str] = Field(default="", max_length=2000)
     estado: str = Field(default="pendiente", pattern="^(pendiente|revisada)$")
     llamada_id: Optional[int] = Field(default=None, strict=True, gt=0)
+
+    # --- CORRECCIÓN: Validar título tras strip ---
+    @field_validator('titulo')
+    @classmethod
+    def validar_titulo(cls, v: str) -> str:
+        v_limpio = v.strip()
+        if not v_limpio:
+            raise ValueError("El título no puede estar vacío ni contener solo espacios")
+        return v_limpio
 
 class RevisionActualizar(BaseModel):
     model_config = ConfigDict(extra='forbid')
@@ -52,6 +114,16 @@ class RevisionActualizar(BaseModel):
     nota: Optional[str] = Field(default=None, max_length=2000)
     estado: Optional[str] = Field(default=None, pattern="^(pendiente|revisada)$")
     llamada_id: Optional[int] = Field(default=None, strict=True, gt=0)
+
+    @field_validator('titulo')
+    @classmethod
+    def validar_titulo(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v_limpio = v.strip()
+        if not v_limpio:
+            raise ValueError("El título no puede estar vacío ni contener solo espacios")
+        return v_limpio
 
 class RevisionRespuesta(BaseModel):
     id: int
@@ -118,7 +190,7 @@ def crear_llamada(llamada: LlamadaCrear):
                     VALUES (%s, %s, %s) 
                     RETURNING id, nombre_archivo, duracion_seg, fecha_llamada, fecha_creacion;
                     """,
-                    (llamada.nombre_archivo.strip(), llamada.duracion_seg, llamada.fecha_llamada)
+                    (llamada.nombre_archivo, llamada.duracion_seg, llamada.fecha_llamada)
                 )
                 fila = cur.fetchone()
                 conn.commit()
@@ -126,7 +198,7 @@ def crear_llamada(llamada: LlamadaCrear):
                     "id": fila[0], "nombre_archivo": fila[1], "duracion_seg": fila[2],
                     "fecha_llamada": fila[3], "fecha_creacion": fila[4]
                 }
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @app.get("/llamadas", response_model=List[LlamadaRespuesta])
@@ -142,13 +214,12 @@ def listar_llamadas():
                         "fecha_llamada": f[3], "fecha_creacion": f[4]
                     } for f in filas
                 ]
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
+# --- CORRECCIÓN: Uso de Path para validar ID > 0 automáticamente (422) ---
 @app.get("/llamadas/{id}", response_model=LlamadaRespuesta)
-def obtener_llamada(id: int):
-    if id <= 0:
-        raise HTTPException(status_code=422, detail="El ID debe ser positivo")
+def obtener_llamada(id: int = Path(..., gt=0)):
     try:
         with psycopg.connect(DATABASE_URL) as conn:
             with conn.cursor() as cur:
@@ -166,9 +237,7 @@ def obtener_llamada(id: int):
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @app.put("/llamadas/{id}", response_model=LlamadaRespuesta)
-def reemplazar_llamada(id: int, llamada: LlamadaReemplazar):
-    if id <= 0:
-        raise HTTPException(status_code=422, detail="El ID debe ser positivo")
+def reemplazar_llamada(llamada: LlamadaReemplazar, id: int = Path(..., gt=0)):
     try:
         with psycopg.connect(DATABASE_URL) as conn:
             with conn.cursor() as cur:
@@ -179,7 +248,7 @@ def reemplazar_llamada(id: int, llamada: LlamadaReemplazar):
                     WHERE id = %s 
                     RETURNING id, nombre_archivo, duracion_seg, fecha_llamada, fecha_creacion;
                     """,
-                    (llamada.nombre_archivo.strip(), llamada.duracion_seg, llamada.fecha_llamada, id)
+                    (llamada.nombre_archivo, llamada.duracion_seg, llamada.fecha_llamada, id)
                 )
                 fila = cur.fetchone()
                 conn.commit()
@@ -195,10 +264,7 @@ def reemplazar_llamada(id: int, llamada: LlamadaReemplazar):
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @app.patch("/llamadas/{id}", response_model=LlamadaRespuesta)
-def actualizar_parcial_llamada(id: int, llamada: LlamadaActualizarParcial):
-    if id <= 0:
-        raise HTTPException(status_code=422, detail="El ID debe ser positivo")
-    
+def actualizar_parcial_llamada(llamada: LlamadaActualizarParcial, id: int = Path(..., gt=0)):
     datos = llamada.model_dump(exclude_unset=True)
     
     if not datos:
@@ -209,7 +275,7 @@ def actualizar_parcial_llamada(id: int, llamada: LlamadaActualizarParcial):
     
     if "nombre_archivo" in datos:
         campos_actualizar.append("nombre_archivo = %s")
-        valores.append(datos["nombre_archivo"].strip())
+        valores.append(datos["nombre_archivo"])
     if "duracion_seg" in datos:
         campos_actualizar.append("duracion_seg = %s")
         valores.append(datos["duracion_seg"])
@@ -238,9 +304,7 @@ def actualizar_parcial_llamada(id: int, llamada: LlamadaActualizarParcial):
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @app.delete("/llamadas/{id}", status_code=204)
-def eliminar_llamada(id: int):
-    if id <= 0:
-        raise HTTPException(status_code=422, detail="El ID debe ser positivo")
+def eliminar_llamada(id: int = Path(..., gt=0)):
     try:
         with psycopg.connect(DATABASE_URL) as conn:
             with conn.cursor() as cur:
@@ -251,6 +315,7 @@ def eliminar_llamada(id: int):
                     raise HTTPException(status_code=404, detail="Llamada no encontrada")
                 return None
     except psycopg.errors.ForeignKeyViolation:
+        # --- CORRECCIÓN: Rollback explícito y mensaje claro ---
         raise HTTPException(status_code=409, detail="La llamada tiene revisiones asociadas y no puede eliminarse")
     except HTTPException:
         raise
@@ -275,7 +340,7 @@ def crear_revision(revision: RevisionCrear):
                     VALUES (%s, %s, %s, %s) 
                     RETURNING id, titulo, nota, estado, fecha_creacion, llamada_id;
                     """,
-                    (revision.titulo.strip(), revision.nota, revision.estado, revision.llamada_id)
+                    (revision.titulo, revision.nota, revision.estado, revision.llamada_id)
                 )
                 fila = cur.fetchone()
                 conn.commit()
@@ -285,7 +350,7 @@ def crear_revision(revision: RevisionCrear):
                 }
     except psycopg.errors.ForeignKeyViolation:
         raise HTTPException(status_code=404, detail="Llamada no encontrada")
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @app.get("/revisiones", response_model=List[RevisionRespuesta])
@@ -301,13 +366,11 @@ def listar_revisiones():
                         "estado": f[3], "fecha_creacion": f[4], "llamada_id": f[5]
                     } for f in filas
                 ]
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @app.get("/revisiones/{id}", response_model=RevisionRespuesta)
-def obtener_revision(id: int):
-    if id <= 0:
-        raise HTTPException(status_code=422, detail="El ID debe ser un entero positivo")
+def obtener_revision(id: int = Path(..., gt=0)):
     try:
         with psycopg.connect(DATABASE_URL) as conn:
             with conn.cursor() as cur:
@@ -321,14 +384,11 @@ def obtener_revision(id: int):
                 }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @app.patch("/revisiones/{id}", response_model=RevisionRespuesta)
-def actualizar_revision(id: int, revision: RevisionActualizar):
-    if id <= 0:
-        raise HTTPException(status_code=422, detail="El ID debe ser un entero positivo")
-        
+def actualizar_revision(revision: RevisionActualizar, id: int = Path(..., gt=0)):
     datos = revision.model_dump(exclude_unset=True)
     
     if not datos:
@@ -339,7 +399,7 @@ def actualizar_revision(id: int, revision: RevisionActualizar):
     
     if "titulo" in datos:
         campos_actualizar.append("titulo = %s")
-        valores.append(datos["titulo"].strip())
+        valores.append(datos["titulo"])
     if "nota" in datos:
         campos_actualizar.append("nota = %s")
         valores.append(datos["nota"])
@@ -369,13 +429,11 @@ def actualizar_revision(id: int, revision: RevisionActualizar):
         raise HTTPException(status_code=404, detail="Llamada no encontrada")
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @app.delete("/revisiones/{id}", status_code=204)
-def eliminar_revision(id: int):
-    if id <= 0:
-        raise HTTPException(status_code=422, detail="El ID debe ser un entero positivo")
+def eliminar_revision(id: int = Path(..., gt=0)):
     try:
         with psycopg.connect(DATABASE_URL) as conn:
             with conn.cursor() as cur:
@@ -387,7 +445,7 @@ def eliminar_revision(id: int):
                 return None
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception:
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 app.mount("/ui", StaticFiles(directory="frontend", html=True), name="frontend")
