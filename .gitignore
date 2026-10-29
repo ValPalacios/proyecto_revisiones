@@ -9,3 +9,5 @@ __pycache__/
 *.log
 backups/
 *.dump
+node_modules/
+dist/
