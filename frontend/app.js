@@ -54,20 +54,29 @@ async function cargarLlamadas() {
             lista.appendChild(li);
         });
     } catch (error) {
-        mostrarEstado("No se pudo cargar. ¿Está la API encendida?", "error");
+        mostrarEstado("No se pudo cargar", "error");
     }
 }
 
 form.addEventListener("submit", async (e) => {
     e.preventDefault();
-    btnGuardar.disabled = true;
     
     const id = document.getElementById("llamada-id").value;
     const fechaLocal = document.getElementById("fecha_llamada").value;
     
+    // Validación de fecha antes de enviar
+    if (!fechaLocal) {
+        mostrarEstado("Debes seleccionar una fecha válida.", "error");
+        return;
+    }
+
     // Convertimos la fecha local a ISO 8601 con zona horaria
     const fechaObjeto = new Date(fechaLocal);
-    
+    if (isNaN(fechaObjeto.getTime())) {
+        mostrarEstado("El formato de fecha no es válido.", "error");
+        return;
+    }
+
     const datos = {
         nombre_archivo: document.getElementById("nombre_archivo").value,
         duracion_seg: parseInt(document.getElementById("duracion_seg").value),
@@ -76,6 +85,9 @@ form.addEventListener("submit", async (e) => {
 
     const metodo = id ? "PUT" : "POST";
     const url = id ? `${API_URL}/${id}` : API_URL;
+
+    // Desactivar botón para evitar clics dobles
+    btnGuardar.disabled = true;
 
     try {
         const res = await fetch(url, {
@@ -91,12 +103,16 @@ form.addEventListener("submit", async (e) => {
             btnGuardar.textContent = "Crear Llamada";
             mostrarEstado("Guardado con éxito.", "exito");
             cargarLlamadas();
+        } else if (res.status === 422) {
+            // Validación fallida (backend)
+            mostrarEstado("Datos inválidos. Revisa la duración y el nombre.", "error");
         } else {
-            mostrarEstado("Error de validación. Revisa los datos.", "error");
+            mostrarEstado("Ocurrió un error al guardar. Inténtalo de nuevo.", "error");
         }
     } catch (error) {
         mostrarEstado("Error de red al intentar guardar.", "error");
     } finally {
+        // Restaurar botón siempre
         btnGuardar.disabled = false;
     }
 });
