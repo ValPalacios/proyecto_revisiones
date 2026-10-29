@@ -8,6 +8,23 @@ services:
       - "127.0.0.1:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U usuario -d qa_callcenter"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  api:
+    build: .
+    container_name: qa_api
+    ports:
+      - "8000:8000"
+    environment:
+      # Usamos 'db' porque Docker resuelve el nombre del servicio internamente
+      - DATABASE_URL=postgresql://usuario:contrasena_segura@db:5432/qa_callcenter
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   pgdata:

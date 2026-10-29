@@ -1,29 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
+import { useLlamadas } from "../hooks/useLlamadas";
 import { api } from "../services/api";
 import LlamadaForm from "../components/LlamadaForm";
 
 export default function LlamadasPage() {
-  const [llamadas, setLlamadas] = useState([]);
-  const [cargando, setCargando] = useState(true);
-  const [error, setError] = useState(null);
+  const { llamadas, cargando, error, recargar } = useLlamadas();
   const [editando, setEditando] = useState(null);
-
-  const cargarDatos = async () => {
-    try {
-      setCargando(true);
-      setError(null);
-      const data = await api.getLlamadas();
-      setLlamadas(data);
-    } catch (err) {
-      setError("No se pudo cargar la lista. ¿Está el backend encendido?");
-    } finally {
-      setCargando(false);
-    }
-  };
-
-  useEffect(() => {
-    cargarDatos();
-  }, []);
 
   const handleGuardar = async (datos) => {
     try {
@@ -36,7 +18,7 @@ export default function LlamadasPage() {
 
       if (res.ok) {
         setEditando(null);
-        cargarDatos(); // Recarga la lista
+        recargar();
       } else if (res.status === 422) {
         alert("Datos inválidos. Revisa la duración o el nombre.");
       } else {
@@ -54,7 +36,7 @@ export default function LlamadasPage() {
       const res = await api.eliminarLlamada(id);
       if (res.status === 204) {
         alert("Llamada eliminada.");
-        cargarDatos();
+        recargar();
       } else if (res.status === 409) {
         alert("La llamada tiene revisiones asociadas y no puede eliminarse.");
       } else {
@@ -68,19 +50,15 @@ export default function LlamadasPage() {
   return (
     <div style={{ padding: "20px", fontFamily: "sans-serif" }}>
       <h1>Gestión de Llamadas Ficticias</h1>
-
-      {/* Mensajes de estado */}
       {cargando && <p>Cargando...</p>}
       {error && <p style={{ color: "red" }}>{error}</p>}
 
-      {/* Formulario */}
       <LlamadaForm 
         onSave={handleGuardar} 
         llamadaEditando={editando} 
         onCancel={() => setEditando(null)} 
       />
 
-      {/* Listado */}
       {!cargando && llamadas.length === 0 && <p>Sin llamadas registradas.</p>}
       
       {llamadas.length > 0 && (
