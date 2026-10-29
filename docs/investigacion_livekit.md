@@ -1,4 +1,4 @@
-# Investigación de LiveKit (Etapa 4)
+# Investigación de LiveKit (Etapa 4 PENDIENTE TERMINAR)
 
 **Fecha de consulta de fuentes:** 29 de octubre de 2026.  
 **Estado:** Investigación funcional para futura implementación. No se ha conectado LiveKit al CRUD actual.
@@ -13,7 +13,7 @@ LiveKit es una plataforma de código abierto diseñada para comunicaciones en ti
 
 ## 2. Diagrama de Flujo Propuesto
 
-*Nota: Este es un recorrido funcional hipotético. Las decisiones marcadas como [Decisión del equipo] deben ser validadas antes de implementar.*
+*Nota: Este es un recorrido funcional hipotético.*
 
 1. **Usuario** solicita ingresar a una sesión desde la interfaz.
 2. **[Decisión del equipo]** El backend valida las credenciales del usuario.

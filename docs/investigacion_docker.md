@@ -1,4 +1,4 @@
-# Investigación de Docker
+# Investigación de Docker (PENDIENTE POR TERMINAR)
 
 ## 1. Conceptos Fundamentales
 
