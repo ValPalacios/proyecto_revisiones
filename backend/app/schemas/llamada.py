@@ -51,11 +51,21 @@ class LlamadaReemplazar(BaseModel):
             raise ValueError("El nombre del archivo no puede estar vacío ni contener solo espacios")
         return v_limpio
 
+
 class LlamadaActualizarParcial(BaseModel):
     model_config = ConfigDict(extra='forbid')
     nombre_archivo: Optional[str] = Field(default=None, min_length=1, max_length=200)
     duracion_seg: Optional[int] = Field(default=None, strict=True, ge=1, le=86400)
     fecha_llamada: Optional[datetime] = None
+
+    # --- VALIDADOR PARA RECHAZAR NULL EXPLÍCITO ---
+    @field_validator('nombre_archivo', 'duracion_seg', 'fecha_llamada', mode='before')
+    @classmethod
+    def rechazar_null_explicito(cls, v, info):
+        if v is None:
+            raise ValueError(f"El campo {info.field_name} no puede ser null explícitamente")
+        return v
+    # -----------------------------------------------------
 
     @field_validator('fecha_llamada')
     @classmethod
@@ -63,7 +73,7 @@ class LlamadaActualizarParcial(BaseModel):
         if v is None:
             return v
         if v.tzinfo is None:
-            raise ValueError("La fecha debe incluir zona horaria (ej. -06:00 o Z)")
+            raise ValueError("La fecha debe incluir zona horaria")
         return v.astimezone(timezone.utc)
 
     @field_validator('nombre_archivo')
@@ -73,5 +83,5 @@ class LlamadaActualizarParcial(BaseModel):
             return v
         v_limpio = v.strip()
         if not v_limpio:
-            raise ValueError("El nombre del archivo no puede estar vacío ni contener solo espacios")
+            raise ValueError("El nombre del archivo no puede estar vacío")
         return v_limpio

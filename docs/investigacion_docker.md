@@ -1,4 +1,4 @@
-# Investigación de Docker (PENDIENTE POR TERMINAR)
+# Investigación de Docker
 
 ## 1. Conceptos Fundamentales
 
@@ -46,3 +46,22 @@ Docker crea una red interna privada. El servicio de base de datos se llama `db` 
 **¿Cuándo puede no convenir?**
 - **Consumo de recursos:** Docker Desktop en Windows/Mac usa una VM ligera por debajo, lo que consume RAM. En equipos con pocos recursos, correr la API de forma nativa puede ser más ligero.
 - **Complejidad:** Para un script de 10 líneas, meterlo en Docker puede ser excesivo. No siempre es "más rápido" (la latencia de red interna puede variar).
+
+## 4. Práctica y Validación del Entorno
+
+Para cumplir con la práctica del proyecto, se realizaron las siguientes acciones:
+
+1. **Configuración del Compose:** Se conservó PostgreSQL 15 y el volumen nombrado (`pgdata`). Se creó un archivo `.env.example` sin secretos reales y se ignoró el `.env` real en Git.
+2. **Dockerfile de la API:** Se creó un Dockerfile usando `python:3.11-slim`, instalando las dependencias de `requirements.txt` y ejecutando la API con Uvicorn. Se agregó un `.dockerignore` para no copiar entornos virtuales ni el archivo `.env`. Además, se configuró un usuario no-root (`appuser`) por seguridad.
+3. **Conexión Interna y Salud:** La API se conecta a la base de datos usando el host `db` y el puerto `5432`. Se agregó un `healthcheck` en el Compose tanto para PostgreSQL como para la API, usando `depends_on: condition: service_healthy` para asegurar el orden de arranque. El endpoint `/salud` verifica la conexión a la base de datos.
+4. **Persistencia (Prueba Realizada):** Se levantaron los contenedores, se creó un registro ficticio, se ejecutó `docker compose down` (sin `-v`) y se volvieron a levantar con `docker compose up -d`. Los datos persistieron correctamente.
+5. **Advertencia de borrado:** Se documentó en el README que `docker compose down -v` elimina el volumen de datos y no debe usarse para pruebas de persistencia.
+
+## 5. Fuentes Consultadas
+- [Docker: ¿Qué es un contenedor?](https://docs.docker.com/get-started/docker-concepts/the-basics/what-is-a-container/)
+- [Docker: Modelo de aplicación Compose](https://docs.docker.com/compose/intro/compose-application-model/)
+- [Docker: Dockerfile](https://docs.docker.com/build/concepts/dockerfile/)
+- [Docker: Volúmenes](https://docs.docker.com/engine/storage/volumes/)
+- [Docker: Redes en Compose](https://docs.docker.com/compose/how-tos/networking/)
+- [Docker: Orden de arranque y salud](https://docs.docker.com/compose/how-tos/startup-order/)
+- [Docker: Alcance de down](https://docs.docker.com/reference/cli/docker/compose/down/)

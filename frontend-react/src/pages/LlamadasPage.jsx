@@ -4,7 +4,7 @@ import { api } from "../services/api";
 import LlamadaForm from "../components/LlamadaForm";
 
 export default function LlamadasPage() {
-  const { llamadas, cargando, error, recargar } = useLlamadas();
+  const { llamadas, cargando, error, recargar, setLlamadas } = useLlamadas();
   const [editando, setEditando] = useState(null);
 
   const handleGuardar = async (datos) => {
@@ -17,8 +17,18 @@ export default function LlamadasPage() {
       }
 
       if (res.ok) {
+        const llamadaGuardada = await res.json(); // <--- Obtenemos la entidad
+        
+        if (editando) {
+            // Actualizamos la lista localmente
+            setLlamadas(llamadas.map(l => l.id === llamadaGuardada.id ? llamadaGuardada : l));
+        } else {
+            // Agregamos a la lista localmente
+            setLlamadas([...llamadas, llamadaGuardada]);
+        }
+        
         setEditando(null);
-        recargar();
+        // ELIMINAMOS EL recargar(); <-- Ya no hacemos la petición GET extra
       } else if (res.status === 422) {
         alert("Datos inválidos. Revisa la duración o el nombre.");
       } else {
@@ -28,7 +38,6 @@ export default function LlamadasPage() {
       alert("Error de red al intentar guardar.");
     }
   };
-
   const handleEliminar = async (id, nombre) => {
     if (!window.confirm(`¿Seguro que quieres eliminar "${nombre}"?`)) return;
 

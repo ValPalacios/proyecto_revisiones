@@ -24,6 +24,17 @@ class RevisionActualizar(BaseModel):
     estado: Optional[str] = Field(default=None, pattern="^(pendiente|revisada)$")
     llamada_id: Optional[int] = Field(default=None, strict=True, gt=0)
 
+    # --- NUEVO VALIDADOR PARA RECHAZAR NULL EXPLÍCITO ---
+    # Nota: No incluimos 'llamada_id' aquí porque en revisiones SÍ se permite 
+    # enviar null explícito para desvincular la revisión de una llamada.
+    @field_validator('titulo', 'nota', 'estado', mode='before')
+    @classmethod
+    def rechazar_null_explicito(cls, v, info):
+        if v is None:
+            raise ValueError(f"El campo {info.field_name} no puede ser null explícitamente")
+        return v
+    # -----------------------------------------------------
+
     @field_validator('titulo')
     @classmethod
     def validar_titulo(cls, v: Optional[str]) -> Optional[str]:

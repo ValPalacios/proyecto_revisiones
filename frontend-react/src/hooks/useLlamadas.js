@@ -23,5 +23,5 @@ export function useLlamadas() {
     cargarDatos();
   }, []);
 
-  return { llamadas, cargando, error, recargar: cargarDatos };
+  return { llamadas, cargando, error, recargar: cargarDatos, setLlamadas };
 }

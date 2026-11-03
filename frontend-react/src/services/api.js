@@ -29,3 +29,18 @@ export const api = {
     return res;
   }
 };
+
+export const apiRevisiones = {
+  getRevisiones: async () => {
+    const res = await fetch(`${API_URL}/revisiones`);
+    if (!res.ok) throw new Error("Error al cargar revisiones");
+    return res.json();
+  },
+  crearRevision: async (data) => fetch(`${API_URL}/revisiones`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+  }),
+  actualizarRevision: async (id, data) => fetch(`${API_URL}/revisiones/${id}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+  }),
+  eliminarRevision: async (id) => fetch(`${API_URL}/revisiones/${id}`, { method: "DELETE" })
+};

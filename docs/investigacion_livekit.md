@@ -1,19 +1,19 @@
-# Investigación de LiveKit (Etapa 4 PENDIENTE TERMINAR)
+# Investigación de LiveKit 
 
-**Fecha de consulta de fuentes:** 29 de octubre de 2026.  
-**Estado:** Investigación funcional para futura implementación. No se ha conectado LiveKit al CRUD actual.
+**Fecha de consulta de fuentes:** 30 de octubre de 2026.  
+**Estado:** Investigación funcional para futura implementación. 
 
 ## 1. Conceptos Básicos y Separación de Componentes
 
 LiveKit es una plataforma de código abierto diseñada para comunicaciones en tiempo real (audio y video). Para entender su alcance, es vital separar sus tres grandes componentes, ya que no todo proyecto necesita los tres:
 
-- **Núcleo de comunicación:** Es el servidor principal. Gestiona salas (rooms), participantes y la publicación/suscripción de tracks (flujos de audio o video). Permite que los usuarios se conecten y se escuchen entre sí.
+- **Núcleo de comunicación:** Es el servidor principal (SFU). Gestiona salas (rooms), participantes y la publicación/suscripción de tracks (flujos de audio o video). Permite que los usuarios se conecten y se escuchen entre sí.
 - **Framework Agents:** Es una capa construida sobre el núcleo que permite crear agentes de Inteligencia Artificial. Estos agentes se unen a la sala como un participante más, escuchan a los usuarios usando STT (Speech-to-Text), procesan la información con un LLM (Modelo de Lenguaje) y responden usando TTS (Text-to-Speech).
 - **Telefonía / SIP:** Permite conectar llamadas de la red telefónica tradicional (PSTN) a una sala de LiveKit. Se usa si el sistema necesita recibir o realizar llamadas a números reales de teléfono.
 
 ## 2. Diagrama de Flujo Propuesto
 
-*Nota: Este es un recorrido funcional hipotético.*
+*Nota: Este es un recorrido funcional hipotético. Los puntos marcados como [Decisión del equipo] deben ser validados.*
 
 1. **Usuario** solicita ingresar a una sesión desde la interfaz.
 2. **[Decisión del equipo]** El backend valida las credenciales del usuario.
@@ -34,7 +34,7 @@ LiveKit es una plataforma de código abierto diseñada para comunicaciones en ti
 | RF-03 | Principal | Habilitar/silenciar audio. | Usuario | Clic en botón | Cambio de estado | Permiso concedido permite audio; denegado muestra explicación. | API del navegador | Connect Docs | **Nativo:** SDK controla el track local. | - |
 | RF-04 | Principal | Informar interrupción o reconexión. | Usuario | Eventos del sistema | Mensajes UI | La interfaz comunica estado y no simula estar conectada si falla. | SDK Frontend | Connect Docs | **Mixto:** LiveKit avisa, nosotros diseñamos la UI. | ¿Qué hacer si falla la red a mitad de llamada? |
 | RF-05 | Por confirmar | Incorporar agente de voz. | Agente IA | Audio del usuario | Audio del agente | El agente responde con coherencia y turnos. | STT, LLM, TTS | Agents Docs | **Nativo (Agents):** Requiere configurar el modelo. | ¿Qué LLM/STT/TTS usar? ¿Costos? |
-| RF-06 | Por confirmar | Llamadas telefónicas o transferencia. | Usuario | Llamada telefónica | Audio en sala | Identificar dirección, actores, destino y proveedor. | Proveedor SIP | Telephony Docs | **Nativo (SIP):** Requiere contratar proveedor. | ¿Realmente se necesitan llamadas reales? |
+| RF-06 | Por confirmar | Llamadas telefónicas o transferencia. | Usuario | Llamada telefónica | Audio en sala | Identificar dirección, actores, destino y proveedor. | Proveedor SIP | Telephony Docs | **Nativo (SIP):** Requiere contratar proveedor. | ¿Realmente se necesitan llamadas reales? *Nota: Transferir una conversación no es lo mismo que transferir una llamada telefónica.* |
 
 ## 4. Matriz de Requisitos Técnicos y No Funcionales
 
@@ -42,10 +42,10 @@ LiveKit es una plataforma de código abierto diseñada para comunicaciones en ti
 | :--- | :--- | :--- |
 | **SDK y backend** | Integración de LiveKit en FastAPI y React. | Uso de `livekit-api` en Python y `livekit-client` en React. |
 | **Permisos de dispositivos** | Acceso al micrófono y cámara. | El navegador exige HTTPS (o localhost). Hay que manejar el caso en que el usuario deniegue el permiso. |
-| **Red** | Puertos y WebRTC. | LiveKit usa UDP. En redes corporativas con firewalls estrictos, puede haber problemas de conexión. |
+| **Red** | Puertos y WebRTC. | LiveKit usa UDP (puertos 50000-60000) y TCP (7881). En redes corporativas con firewalls estrictos, puede haber problemas de conexión. |
 | **Alojamiento** | Cloud vs Autogestionado. | **Cloud:** Fácil, pero de pago. **Autogestionado:** Usar Docker en servidores propios (requiere administración). *Decisión pendiente.* |
 | **Seguridad de tokens** | Generación de claves JWT. | Claves API y Secret guardadas en el `.env` del backend. El frontend recibe tokens limitados. **Nunca** claves secretas en variables `VITE_`. |
-| **Privacidad** | Grabación y transcripción. | LiveKit permite grabación. ¿Es legal/necesario? Requiere aviso de privacidad. *Decisión pendiente.* |
+| **Privacidad** | Grabación y transcripción. | LiveKit permite grabación (Egress). ¿Es legal/necesario conservar datos? Requiere aviso de privacidad. *Opción por confirmar.* |
 | **Observabilidad** | Logs y monitoreo. | En local, revisar logs de Docker. En Cloud, usar el dashboard de LiveKit. |
 | **Capacidad/Latencia** | Usuarios simultáneos. | No inventar cifras objetivo. Se debe hacer una prueba de carga antes de lanzar a producción. |
 
@@ -57,6 +57,7 @@ LiveKit es una plataforma de código abierto diseñada para comunicaciones en ti
 3. ¿Usaremos LiveKit Cloud (pago) o autogestionado (Docker en nuestro servidor)?
 4. ¿Cómo autenticaremos a los usuarios antes de generarle el token? (¿Reutilizamos nuestro CRUD actual?).
 5. ¿Necesitamos grabar o transcribir las sesiones por temas de calidad o legales?
+6. **Grabación, transcripción y conservación de datos:** Se anotan como opciones por confirmar, no como capacidades asumidas del alcance mínimo.
 
 **Alcance mínimo recomendado:**
 *No es un compromiso de implementación, sino una sugerencia para la primera iteración.*
