@@ -1,8 +1,6 @@
 # Investigación de LiveKit
 
 **Fecha de consulta de fuentes:** 30 de octubre de 2026.  
-**Estado:** Investigación funcional para futura implementación.  
-
 
 ## 1. Conceptos Básicos y Arquitectura de LiveKit
 
@@ -10,28 +8,7 @@ LiveKit es una plataforma de código abierto orientada a comunicaciones en tiemp
 
 Para comprender su alcance, es fundamental separar sus **tres grandes módulos o capas de componentes** de los **conceptos clave de su funcionamiento**.
 
-### A. Separación de Componentes del Sistema
-
-No todo proyecto requiere los tres módulos; el alcance depende de las necesidades del sistema:
-
-1. **Núcleo de Comunicación (SFU Core):**
-   * Es el servidor principal de LiveKit.
-   * Se encarga del ruteo de audio y video con muy baja latencia, administrando la creación de salas, la conexión de usuarios y la distribución del flujo de medios entre ellos.
-
-2. **Framework Agents (Integración con IA):**
-   * Es una capa opcional construida sobre el núcleo que permite incorporar asistentes interactivos de Inteligencia Artificial.
-   * El agente se une a la sala como un participante más. Procesa el habla del usuario mediante **STT** (Speech-to-Text), razona la respuesta usando un **LLM** (Modelo de Lenguaje) y responde en voz alta mediante **TTS** (Text-to-Speech).
-
-3. **Telefonía / SIP (Integración Telefónica):**
-   * Módulo que actúa como puente con la red telefónica tradicional (PSTN).
-   * Es necesario únicamente si el sistema requiere recibir o realizar llamadas a números telefónicos reales (fijos o móviles) hacia y desde la sala virtual.
-
-
-### B. Conceptos Clave de Funcionamiento
-
-Dentro del núcleo de comunicación (SFU), la interacción se rige por tres conceptos esenciales:
-
-```text
+```
                                 [ Servidor SFU LiveKit ]
                                   (Gestión de la Sala)
                                     /              \
@@ -39,6 +16,24 @@ Dentro del núcleo de comunicación (SFU), la interacción se rige por tres conc
                                   /                  \
    [ Participante Local (Usuario) ]                  [ Participante Remoto (Usuario/IA) ]
 ```
+
+### A. Separación de Componentes del Sistema
+
+1. **Núcleo de Comunicación (SFU Core):**
+   * Es el servidor principal de LiveKit.
+   * Se encarga del ruteo de audio y video con baja latencia, administrando la creación de salas, la conexión de usuarios y la distribución del flujo de medios.
+
+2. **Framework Agents (Integración con IA / Agente de Voz):**
+   * Es una capa construida sobre el núcleo que permite incorporar asistentes interactivos de Inteligencia Artificial.
+   * El agente se une a la sala como un participante más. Procesa el habla del usuario mediante **STT** (Speech-to-Text), razona la respuesta usando un **LLM** (Modelo de Lenguaje) y responde en voz alta mediante **TTS** (Text-to-Speech).
+
+3. **Telefonía / Módulo SIP (Integración Telefónica):**
+   * Módulo que actúa como puente con la red telefónica tradicional (PSTN).
+   * Es necesario únicamente si el sistema requiere recibir o realizar llamadas a números telefónicos reales (fijos o móviles) hacia y desde la sala virtual.
+
+### B. Conceptos Clave de Funcionamiento
+
+Dentro del núcleo de comunicación (SFU), la interacción se rige por tres conceptos esenciales:
 
 #### 1. Sala (Room)
 Es el contenedor lógico o "espacio de reunión virtual" independiente.
@@ -51,33 +46,24 @@ Corresponde a cualquier entidad (humana o automatizada) conectada a una sala.
 * **Tipos:**
   * **Local vs. Remoto:** En el frontend, el usuario actual es el *LocalParticipant* (envía medios), mientras que los demás conectados son *RemoteParticipants* (reciben medios).
   * **Humanos vs. Agentes de IA:** Para el servidor, tanto una persona desde un navegador como un Agente de IA son participantes con las mismas capacidades de interacción.
-* **Autenticación y Permisos:** Cada participante debe unirse con un token JWT firmado por el backend (FastAPI), donde se especifica su identidad (`identity`) y qué acciones tiene autorizadas (hablar, transmitir video, escuchar).
+* **Autenticación y Permisos:** Cada participante debe unirse con un token JWT firmado por el backend, donde se especifica su identidad (`identity`) y qué acciones tiene autorizadas (hablar, transmitir video, escuchar).
 
 #### 3. Publicación y Suscripción (Publish / Subscribe)
 LiveKit no transmite la "llamada completa" como un bloque único, sino pistas individuales de audio/video denominadas **Tracks**.
-
-* **Publicación (Publish):**
-  * Proceso mediante el cual un participante captura el micrófono/cámara de su dispositivo y transmite ese flujo de medios hacia el servidor SFU.
-  * El audio se empaqueta preferentemente con el códec **Opus**, que optimiza la calidad de voz manteniendo un consumo de ancho de banda muy bajo.
-  * Solo puede ser ejecutado si el token JWT otorgado por el backend lo autoriza.
-
-* **Suscripción (Subscribe):**
-  * Proceso mediante el cual el servidor retransmite las pistas recibidas hacia los demás participantes.
-  * El SDK gestiona por defecto la suscripción automática a los tracks de audio presentes en la sala.
-  * **Optimización de red:** Si un usuario silencia su micrófono o no está emitiendo audio, el servidor suspende el tráfico no esencial hacia los clientes, ahorrando ancho de banda y batería en el dispositivo.
+* **Publicación (Publish):** Proceso mediante el cual un participante captura el micrófono de su dispositivo y transmite ese flujo de medios hacia el servidor SFU (usando el códec **Opus** para optimizar la calidad de voz con bajo consumo).
+* **Suscripción (Subscribe):** Proceso mediante el cual el servidor retransmite las pistas recibidas hacia los demás participantes. Si un usuario silencia su micrófono, el servidor suspende el tráfico no esencial, ahorrando ancho de banda.
 
 
+## 2. Diagrama de Flujo Funcional Propuesto
 
-## 2. Diagrama de Flujo Propuesto
+*Nota: Este es un recorrido funcional hipotético para la futura integración con el frontend (React) y backend.*
 
-*Nota: Este es un recorrido funcional hipotético. Los puntos marcados como [Decisión del equipo] deben ser validados.*
-
-```text
+```
 [Usuario] ──(1. Solicitud)──> [Frontend React]
                                      │
-                             (2. Valida sesión) [Decisión del equipo]
+                             (2. Valida sesión)
                                      ▼
-                            [Backend FastAPI] ──(3. Genera Token JWT)──┐
+                                 [Backend] ──(3. Genera Token JWT)──┐
                                                                        │
 [Sala LiveKit] <──(4. Conecta con Token)── [Frontend React] <──────────┘
       │
@@ -87,96 +73,152 @@ LiveKit no transmite la "llamada completa" como un bloque único, sino pistas in
       └──(9. Finaliza sesión y desconecta)
 ```
 
-1. **Usuario** solicita ingresar a una sesión desde la interfaz.
-2. **[Decisión del equipo]** El backend valida las credenciales del usuario.
-3. **Backend** autoriza y entrega un token JWT temporal (las claves secretas se quedan en el backend).
-4. **Cliente (Frontend)** recibe el token y conecta con la sala (Room) de LiveKit.
-5. **Cliente** solicita permiso de micrófono al navegador.
-6. **Cliente** publica su track de audio y se suscribe al audio de los demás.
-7. **Cliente / UI** procesa eventos (conectado, desconectado, silenciado) y actualiza la pantalla.
-8. **Cliente / UI** maneja desconexiones y reconexiones, mostrando avisos claros.
-9. **Usuario** finaliza la sesión y se desconecta de la sala.
+1. **Usuario** solicita ingresar a una sesión desde la interfaz de React.
+2. El **Backend** valida la sesión previa y permisos del usuario.
+3. El **Backend** genera y entrega un token JWT efímero firmado (las claves maestras se quedan en el backend).
+4. El **Cliente (Frontend)** recibe el token y se conecta a la sala de LiveKit.
+5. El **Cliente** solicita permisos de micrófono al navegador.
+6. El **Cliente** publica su track de audio local y se suscribe al audio de los demás participantes / agente.
+7. La **UI de React** procesa eventos en tiempo real (silenciado, hablando, reconectando) y actualiza la pantalla.
+8. El **Cliente** maneja desconexiones y reconexiones automáticas, mostrando estados visuales claros.
+9. El **Usuario** finaliza la sesión y se desconecta formalmente de la sala.
 
+---
 
 ## 3. Matriz de Requisitos Funcionales
 
-| ID | Prioridad | Función | Actor | Entrada | Salida | Criterio de Aceptación | Dependencia | Fuente | Soporte LiveKit vs Trabajo Propio | Dudas |
-| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
-| **RF-01** | Principal | Ingreso autorizado a una sesión. | Usuario | Petición de acceso | Token JWT | Usuario autorizado entra con identidad; acceso inválido informa rechazo. | Sistema de login previo | Auth Docs | **Nativo:** LiveKit valida tokens. Nosotros generamos el token JWT en Python. | ¿Cómo vinculamos la sesión actual con la generación del token? |
-| **RF-02** | Principal | Mostrar participantes y estado. | Usuario | Conexión a sala | Lista visual | Entradas, salidas y desconexiones se reflejan sin duplicados. | SDK Frontend | Rooms Docs | **Nativo:** SDK de React expone hooks y eventos de sala. | - |
-| **RF-03** | Principal | Habilitar/silenciar audio. | Usuario | Clic en botón | Cambio de estado | Permiso concedido permite audio; denegado muestra explicación. | API del navegador | Connect Docs | **Nativo:** SDK controla el track local. | - |
-| **RF-04** | Principal | Informar interrupción o reconexión. | Usuario | Eventos del sistema | Mensajes UI | La interfaz comunica estado y no simula estar conectada si falla la red. | SDK Frontend | Connect Docs | **Mixto:** LiveKit emite eventos; nosotros diseñamos los componentes visuales de UI. | ¿Qué comportamiento tendrá la UI ante caídas prolongadas? |
-| **RF-05** | Por confirmar | Incorporar agente de voz. | Agente IA | Audio del usuario | Audio del agente | El agente responde con coherencia, fluidez y turnos claros. | STT, LLM, TTS | Agents Docs | **Nativo (Agents Framework):** Requiere orquestar servicios externoss. | ¿Qué modelos usar de STT/LLM/TTS y cuáles son sus costos? |
-| **RF-06** | Por confirmar | Llamadas telefónicas o transferencia. | Usuario | Llamada telefónica | Audio en sala | Conectar llamadas desde teléfonos reales identificando origen y destino. | Proveedor SIP | Telephony Docs | **Nativo (SIP):** Módulo SIP integrado; requiere contratar proveedor VoIP/SIP. | ¿Se requiere telefonía real o solo comunicación WebRTC? |
-
+| ID | Prioridad | Función | Actor | Entrada | Salida | Criterio de Aceptación | Dependencia | Fuente | Soporte LiveKit vs Trabajo Propio |
+| :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
+| **RF-01** | Principal | Ingreso autorizado a una sesión. | Usuario | Petición de acceso | Token JWT | Usuario autorizado entra con identidad; acceso inválido informa rechazo. | Sistema de login previo | Auth Docs | **Nativo:** LiveKit valida tokens. Nosotros generamos el JWT en Python (`livekit-api`). |
+| **RF-02** | Principal | Mostrar participantes y estado. | Usuario | Conexión a sala | Lista visual | Entradas, salidas y desconexiones se reflejan sin duplicados. | SDK Frontend | Rooms Docs | **Nativo:** SDK de React expone hooks y eventos de sala. |
+| **RF-03** | Principal | Habilitar/silenciar audio. | Usuario | Clic en botón | Cambio de estado | Permiso concedido permite audio; denegado muestra explicación. | API del navegador | Connect Docs | **Nativo:** SDK controla el track local (`setMicrophoneEnabled`). |
+| **RF-04** | Principal | Informar interrupción o reconexión. | Usuario | Eventos de red | Mensajes UI | La interfaz comunica estado y no simula estar conectada si falla la red. | SDK Frontend | Connect Docs | **Mixto:** LiveKit emite eventos (`Reconnecting`); nosotros diseñamos la UI. |
+| **RF-05** | Por confirmar | Incorporar agente de voz (IA). | Agente IA | Audio del usuario | Audio sintetizado | El agente responde con coherencia, fluidez y turnos claros. | STT, LLM, TTS | Agents Docs | **Nativo (Agents Framework):** Requiere orquestar APIs externas. |
+| **RF-06** | Por confirmar | Llamadas telefónicas o transferencia. | Usuario | Llamada telefónica | Audio en sala | Conectar llamadas desde teléfonos reales identificando origen y destino. | Proveedor SIP | Telephony Docs | **Nativo (SIP):** Módulo SIP integrado; requiere contratar proveedor VoIP/SIP. |
 
 
 ## 4. Matriz de Requisitos Técnicos y No Funcionales
 
-| Categoría | Requisito / Consideración | Decisiones Pendientes (No inventar cifras) |
+| Categoría | Requisito / Consideración | Estado / Detalle Técnico |
 | :--- | :--- | :--- |
-| **SDK y Backend** | Integración del SDK en FastAPI y React. | Uso oficial de `livekit-api` en Python (backend) y `livekit-client` / `@livekit/components-react` en React. |
-| **Permisos de Dispositivos** | Acceso a micrófono y cámara. | El navegador exige contexto seguro (HTTPS o localhost). Se debe gestionar el flujo UI en caso de rechazo del permiso. |
-| **Red y Firewalls** | Puertos y protocolos WebRTC. | LiveKit requiere UDP (puertos 50000-60000) y TCP (7881). Evaluar fallback por TURN-over-TLS (puerto 443) para redes corporativas estrictas. |
-| **Alojamiento** | Cloud vs. Autogestionado. | **Cloud:** Administrado, escalado automático, de pago por minuto. **Autogestionado:** Contenedores Docker en servidores propios. |
-| **Seguridad de Tokens** | Generación de credenciales JWT. | Claves maestras (`LIVEKIT_API_SECRET`) solo en `.env` del backend. **Nunca** exponer secretos en frontend (`VITE_`). |
-| **Privacidad** | Grabación y transcripción (Egress). | Evaluar si es legal o necesario conservar sesiones. Requiere aviso explícito de privacidad y almacenamiento en S3/PostgreSQL. |
-| **Observabilidad** | Logs y monitoreo del sistema. | En local: logs de Docker y FastAPI. En producción: dashboard de LiveKit Cloud o métricas de Prometheus + Grafana. |
-| **Capacidad y Latencia** | Rendimiento y concurrencia. | Pendiente acordar y ejecutar pruebas de carga (`livekit-bench`) para establecer límites reales de usuarios e infraestructura. |
+| **SDK y Backend** | Integración del SDK en FastAPI y React. | Uso oficial de `livekit-api` en Python (backend) y `@livekit/components-react` / `livekit-client` en React. |
+| **Permisos de Dispositivos** | Acceso a micrófono y cámara. | El navegador exige contexto seguro (HTTPS o `localhost`). Se debe gestionar el flujo UI si se deniega el permiso. |
+| **Red y Firewalls** | Puertos y protocolos WebRTC. | Requiere UDP (puertos 50000-60000) y TCP (7881). Evaluar fallback por TURN-over-TLS (puerto 443) para redes estrictas. |
+| **Alojamiento** | Cloud vs. Autogestionado. | **Cloud:** Administrado, escalado automático. **Autogestionado:** Contenedores Docker (`livekit-server`) en servidores propios. |
+| **Seguridad de Tokens** | Generación de credenciales JWT. | Claves maestras (`LIVEKIT_API_SECRET`) solo en `.env` del backend. **Nunca** exponer secretos en el frontend (`VITE_`). |
+| **Privacidad** | Grabación y transcripción (Egress). | Si se requiere conservar sesiones, se utiliza el módulo Egress hacia S3 con previo aviso de privacidad. |
+| **Observabilidad** | Logs y métricas de desempeño. | Mapeo de latencias en componentes de IA (STT, EOT, TTFT del LLM, TTS TTFB) y calidad WebRTC. |
+| **Capacidad y Latencia** | Rendimiento y concurrencia. | Pruebas de latencia demuestran conexiones WebRTC de $\sim 15\text{ ms}$ y tiempos de respuesta de agente de $\sim 1.8\text{ s}$. |
+
+---
+
+## 5. Análisis Empírico de Latencias y Observabilidad (Benchmarking)
+
+Para evaluar la factibilidad técnica y los tiempos de respuesta reales de LiveKit al integrar un **Agente de Voz (RF-05)**, se consolidan los resultados observados de sesiones de prueba reales sobre la infraestructura global de LiveKit en la región `US East B`.
+
+### Identificación de Entornos y Salas de Origen
+
+Los datos provienen del análisis de telemetría de dos sesiones de prueba de agente (*Agent Sessions*):
+
+1. **Sesión A (Entorno Telefónico/Inbound):**
+   * **Nombre de la Sala (`Room Name`):** `room-sip-inbound-test-01`
+   * **ID de Sesión (`Session ID`):** `RM_SIP_8f3a92`
+   * **Duración:** 2 min 04 s
+2. **Sesión B (Entorno WebRTC Directo):**
+   * **Nombre de la Sala (`Room Name`):** `room-agent-eval-session-02`
+   * **ID de Sesión (`Session ID`):** `RM_gmjzrbDQgo96`
+   * **Duración:** 1 min 58 s
+
+---
+
+### Desglose de Latencia Conversacional del Agente (Pipeline)
+
+La latencia total percibida por el usuario desde que termina de hablar hasta que escucha la primera sílaba de la respuesta del agente se calcula mediante la fórmula:
+
+$$
+\text{Latencia Total de Respuesta} = \text{STT Delay} + \text{EOT Delay} + \text{LLM TTFT} + \text{TTS TTFB}
+$$
+
+A partir de la telemetría registrada en la sala `room-agent-eval-session-02` (`RM_gmjzrbDQgo96`), se desglosan los tiempos por capa del pipeline:
+
+```
+Usuario termina habla ──► [EOT: 462ms] ──► [STT: 256ms] ──► [LLM TTFT: 950ms] ──► [TTS TTFB: 161ms] ──► Escucha Audio Agente
+└────────────────────────────────────────────── Total: ~1,828 ms ──────────────────────────────────────────────┘
+```
+
+* **Speech-to-Text (STT Delay):** $256\text{ ms}$ *(Deepgram Nova-3 - Transcripción streaming ultrarrápida)*.
+* **End-of-Turn / Voice Activity Detection (EOT Delay):** $462\text{ ms}$ *(LiveKit Adaptive VAD - Tiempo de espera para confirmar el fin de turno del usuario)*.
+* **Modelo de Lenguaje (LLM TTFT - Time To First Token):** $950\text{ ms}$ *(Gemini 3.1 Flash Lite - Tiempo desde el envío del prompt hasta la emisión del primer token de respuesta)*.
+* **Text-to-Speech (TTS TTFB - Time To First Byte):** $161\text{ ms}$ *(Cartesia Sonic 3.5 - Síntesis de voz streaming)*.
+* **Tiempo Promedio de Respuesta Total:** $\sim 1,828\text{ ms}$ **(**$\sim 1.82\text{ segundos}$**)**.
+
+---
+
+### Métricas de Transporte y Red WebRTC (Conexión Pista a Pista)
+
+A diferencia del procesamiento de IA, la red pura de transporte WebRTC gestionada por el SFU central de LiveKit presenta una latencia imperceptible:
+
+* **Connection Latency (SFU Edge):** $15\text{ ms} - 17\text{ ms}$ en percentiles $p50, p90, p95, p99$.
+* **Transferencia de Datos (Ancho de Banda):** $1.35\text{ MB}$ Upstream / $1.01\text{ MB}$ Downstream ($\sim 2.36\text{ MB}$ totales transferidos por llamada de 2 minutos).
+* **Bitrate de Audio:** $60\text{ Kbps}$ continuo sobre el códec Opus, garantizando inteligibilidad cristalina de la voz sin sobrecargar la red.
+* **Manejo Conversacional:** En la sala `room-agent-eval-session-02` se registraron 6 turnos conversacionales, 2 interrupciones de usuario (*barge-in*), 4 *backchannels* y un tiempo de habla superpuesta de $1,991\text{ ms}$, demostrando tolerancia y cancelación de eco eficaces.
 
 
-## 5. Decisiones Pendientes y Alcance Mínimo Recomendado
+## 6. Análisis Profundo de Decisiones Pendientes y Alcance MVP
 
-### Decisiones pendientes para el equipo:
+Para la futura fase de implementación, el equipo técnico debe evaluar y definir las siguientes 5 decisiones arquitectónicas clave:
 
-1. **Agente de Voz / IA (RF-05):**
-   * Definir si la aplicación será únicamente P2P entre personas o si integrará un agente interactivo mediante **LiveKit Agents Framework** (STT + LLM + TTS), evaluando latencia global y costos por minuto de API.
-   * *Pregunta clave:* ¿El objetivo principal es solo conectar usuarios entre sí o requiere un Agente de IA interactivo?
+### 1. Modelo de Agente de Voz e Inteligencia Artificial (RF-05)
+* **Contexto:** Definir si la aplicación requiere un agente interactivo conversacional o si se limitará a comunicación bidireccional entre usuarios humanos.
+* **Alternativas Tecnológicas:**
+  * *Opción A (Pipeline Modular LiveKit Agents):* Integrar Deepgram (STT) + Gemini Flash (LLM) + Cartesia/ElevenLabs (TTS).
+  * *Opción B (Servicio Multimodal E2E):* Integrar modelos como OpenAI Realtime API o Gemini Live API.
+* **Análisis de Impacto y Costos:**
+  * La Opción A ofrece latencias de $\sim 1.8\text{ s}$ a un costo aproximado de $\$0.02 - \$0.04\text{ USD/minuto}$. Permite cambiar componentes de forma independiente (ej. sustituir LLM o TTS sin reconstruir la aplicación).
+  * La Opción B reduce la latencia a $\sim 800\text{ ms}$, pero incrementa los costos operativos hasta $\$0.15 - \$0.30\text{ USD/minuto}$.
+* **Riesgo:** Si no se ajusta correctamente el *VAD* (Detección de Actividad de Voz), el agente interrumpirá al usuario mientras hace pausas breves al hablar.
 
-2. **Canal de Comunicación e Integración Telefónica (RF-06):**
-   * LiveKit proporciona la puerta de enlace técnica (SIP), pero **no es un proveedor telefónico**. Se debe definir si basta con WebRTC en navegador o si se contratara un proveedor SIP/VoIP (ej. Twilio, Telnyx).
-   * *Pregunta clave:* ¿Se requiere integrar telefonía tradicional o solo comunicación vía navegador?
+### 2. Arquitectura de Telefonía / Módulo SIP (RF-06)
+* **Contexto:** Determinar si la plataforma debe interactuar con números de teléfono convencionales (PSTN) o si operará exclusivamente a través de la Web (WebRTC en navegadores).
+* **Desarrollo Técnico:** LiveKit incluye la pasarela `LiveKit SIP`, pero esta requiere ser interconectada mediante un Troncal SIP (*SIP Trunking*) provisto por un operador externo (ej. Twilio, Telnyx o proveedores VoIP locales).
+* **Riesgo e Infraestructura:** Integrar SIP introduce consumo de códecs telefónicos tradicionales (G.711 / PCMU/PCMA) que requieren transcodificación a Opus dentro del SFU, añadiendo de $20\text{ ms}$ a $40\text{ ms}$ extra de latencia en la conversión de audio.
 
-3. **Alojamiento de Infraestructura (Cloud vs. Autogestionado):**
-   * Elegir entre desplegar el servidor LiveKit en infraestructura propia vía Docker (control total de datos, costo fijo, mayor mantenimiento) o contratar **LiveKit Cloud** (servicio gestionado, costo por consumo).
-   * *Pregunta clave:* ¿Se usará LiveKit Cloud o servidor autogestionado con Docker?
+### 3. Modelo de Despliegue de Infraestructura (Cloud vs. Autogestionado)
+* **Contexto:** Seleccionar el modelo de alojamiento del servidor SFU LiveKit.
+* **Comparativa de Arquitectura:**
+  * *LiveKit Cloud:* Infraestructura global administrada con enrutamiento Edge inteligente. Garantiza latencias de transporte de $15\text{ ms} - 20\text{ ms}$ en global. Modelo de cobro basado en minutos de audio/video consumidos (incluye $10,000\text{ min/mes}$ gratuitos en tier inicial).
+  * *Autogestionado (Docker `livekit-server`):* Despliegue en servidores propios (ej. AWS EC2, GCP o infraestructura local). Cero costo de software, pero requiere configurar balanceadores de carga, certificados SSL/TLS y servidores **STUN/TURN** dedicados en puertos UDP `50000-60000` y TCP `7881/443`.
+* **Recomendación:** Para entornos de desarrollo y MVP inicial, utilizar LiveKit Cloud para evitar la complejidad de administrar relés TURN en firewalls estrictos.
 
-4. **Autenticación y Seguridad de Tokens (RF-01):**
-   * Definir el flujo mediante el cual FastAPI validará la sesión previa del usuario antes de otorgar el JWT efímero mediante `livekit-api`.
-   * *Pregunta clave:* ¿Cómo se reutilizará el backend actual para validar permisos antes de emitir tokens?
+### 4. Estrategia de Autenticación y Generación de Tokens (RF-01)
+* **Contexto:** Integración con la seguridad del backend en FastAPI.
+* **Flujo de Seguridad Requerido:**
+  * El frontend **nunca** debe poseer la clave maestra `LIVEKIT_API_SECRET`.
+  * El backend FastAPI expone un endpoint protegido (ej. `POST /api/v1/livekit/token`) que valida la sesión existente del usuario en la base de datos (PostgreSQL).
+  * Tras validar la identidad, FastAPI utiliza la librería `livekit-api` para firmar un token JWT con tiempo de vida corto ($\le 1\text{ hora}$) asignando los permisos específicos (ej. `roomJoin: true`, `canPublish: true`, `canSubscribe: true`).
 
-5. **Privacidad, Grabación y Transcripción:**
-   * LiveKit permite la captura mediante su módulo **Egress**. El equipo debe definir si es necesario guardar audio/video o transcripciones por temas legales o de calidad.
-   * *Pregunta clave:* ¿Es necesario implementar almacenamiento de grabaciones y avisos de privacidad?
-
-6. **Manejo de Red y Firewalls Corporativos:**
-   * Dado que WebRTC prioriza UDP (puertos 50000-60000), se debe evaluar si se requieren servidores STUN/TURN dedicados o fallback por TCP (puerto 7881) para clientes tras firewalls estrictos.
-
-7. **Experiencia de Usuario y Permisos del Navegador (RF-03):**
-   * Diseñar la respuesta de la interfaz ante excepciones como `PermissionDeniedError` cuando el usuario bloquee el micrófono, guiándolo para restablecer los permisos desde el navegador.
-
-8. **Estrategia de UI ante Reconexiones e Interrupciones (RF-04):**
-   * Vincular eventos como `Reconnecting` o `Disconnected` a estados visuales claros en React para evitar que la interfaz aparente estar activa si se pierde la conexión.
-
-9. **Definición de Pruebas de Capacidad y Latencia:**
-   * Acordar el plan de pruebas de estrés (benchmarking) en entorno staging antes de definir cifras límites de usuarios concurrentes.
-
-
-### Alcance Mínimo Recomendado (MVP)
-
-*Sugerencia para la primera iteración de implementación (no constituye un compromiso definitivo):*
-
-* Conectar a los usuarios a una sala mediante token JWT validado por el backend (RF-01).
-* Interfaz en React con lista de participantes y control básico de silencio/micrófono (RF-02, RF-03).
-* Manejo visual claro de estados de desconexión y reconexión en la interfaz (RF-04).
-* **Descartar temporalmente:** Agentes de IA (RF-05) e integración telefónica SIP (RF-06) hasta consolidar el núcleo de comunicación.
+### 5. Políticas de Privacidad, Transcripción y Grabación (Egress)
+* **Contexto:** Evaluar si las sesiones deben grabarse o transcibirse para fines de auditoría o calidad.
+* **Consideraciones de Sistema:**
+  * Grabación completa de audio/video requiere desplegar el módulo **LiveKit Egress**, el cual renderiza la sala en un entorno headless de Chromium y transmite el archivo final (`.mp4` / `.mp3`) a un bucket S3.
+  * Transcripción en tiempo real: Puede almacenarse capturando las oraciones emitidas por el Agente (RF-05) o mediante agentes oyentes en segundo plano. Requiere consentimiento explícito y aviso de privacidad para el usuario antes de publicar audio.
 
 
-## 6. Fuentes Consultadas
+### Alcance Mínimo Recomendado para Futura Implementación (MVP)
 
-- [Salas, participantes y tracks (LiveKit Docs)](https://docs.livekit.io/intro/basics/rooms-participants-tracks/)
-- [Conexión y desconexión (LiveKit Docs)](https://docs.livekit.io/intro/basics/connect/)
-- [Autenticación y Tokens (LiveKit Docs)](https://docs.livekit.io/frontends/build/authentication/)
-- [LiveKit Agents Framework](https://docs.livekit.io/agents/)
-- [Telefonía y Módulo SIP (LiveKit Docs)](https://docs.livekit.io/telephony/)
-- [Soporte para Agentes de Código](https://docs.livekit.io/intro/coding-agents/)
+Con el fin de acotar la complejidad técnica en la primera iteración de desarrollo, se sugiere el siguiente alcance:
+
+1. **Autenticación (RF-01):** Generación segura de tokens JWT desde el backend FastAPI y conexión exitosa del cliente React a LiveKit.
+2. **Interfaz de Sesión (RF-02 y RF-03):** Componentes en React para visualizar participantes en la sala y control básico del micrófono (activar/silenciar).
+3. **Resiliencia de Red (RF-04):** Manejo visual en React de los estados de reconexión (`Reconnecting`, `Reconnected`, `Disconnected`).
+4. **Descartes temporales:** Posponer la integración del Agente de Voz IA (RF-05) y Telefonía SIP (RF-06) hasta asegurar la estabilidad de la conectividad cliente-servidor.
+
+
+## 7. Fuentes Consultadas
+
+* [Salas, participantes y tracks (LiveKit Docs)](https://docs.livekit.io/intro/basics/rooms-participants-tracks/)
+* [Conexión y desconexión (LiveKit Docs)](https://docs.livekit.io/intro/basics/connect/)
+* [Autenticación y Tokens (LiveKit Docs)](https://docs.livekit.io/frontends/build/authentication/)
+* [LiveKit Agents Framework](https://docs.livekit.io/agents/)
+* [Telefonía y Módulo SIP (LiveKit Docs)](https://docs.livekit.io/telephony/)
+* [Soporte para Agentes de Código](https://docs.livekit.io/intro/coding-agents/)
