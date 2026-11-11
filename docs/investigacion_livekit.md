@@ -208,7 +208,7 @@ Para la futura fase de implementación, el equipo técnico debe evaluar y defini
 
 Con el fin de acotar la complejidad técnica en la primera iteración de desarrollo, se sugiere el siguiente alcance:
 
-1. **Autenticación (RF-01):** Generación segura de tokens JWT desde el backend FastAPI y conexión exitosa del cliente React a LiveKit.
+1. **Autenticación (RF-01):** Generación segura de tokens JWT desde el backend y conexión exitosa del cliente React a LiveKit.
 2. **Interfaz de Sesión (RF-02 y RF-03):** Componentes en React para visualizar participantes en la sala y control básico del micrófono (activar/silenciar).
 3. **Resiliencia de Red (RF-04):** Manejo visual en React de los estados de reconexión (`Reconnecting`, `Reconnected`, `Disconnected`).
 4. **Descartes temporales:** Posponer la integración del Agente de Voz IA (RF-05) y Telefonía SIP (RF-06) hasta asegurar la estabilidad de la conectividad cliente-servidor.
