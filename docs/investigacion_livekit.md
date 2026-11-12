@@ -1,9 +1,9 @@
 # Investigación Funcional de LiveKit
 
 **Fecha de consulta de fuentes:** 12 de noviembre de 2026.  
-**Estado:** Investigación funcional y de requisitos para futura implementación (sin código ni despliegue activo).  
+**Estado:** Investigación funcional   
 
----
+
 
 ## 1. Conceptos Básicos y Separación de Componentes
 
@@ -19,7 +19,6 @@ LiveKit es una infraestructura de código abierto para comunicaciones en tiempo 
 2. **Framework Agents:** Capa opcional para incorporar agentes de IA que participan en la sala como un usuario más, escuchando mediante STT (*Speech-to-Text*), procesando con un LLM y respondiendo con voz mediante TTS (*Text-to-Speech*).
 3. **Telefonía / SIP:** Módulo opcional que actúa como pasarela para conectar llamadas de la red telefónica tradicional (PSTN) con una sala de LiveKit.
 
----
 
 ## 2. Flujo Funcional Propuesto (Recorrido de Usuario y Sistema)
 
@@ -47,7 +46,6 @@ LiveKit es una infraestructura de código abierto para comunicaciones en tiempo 
 8. **[Decisión del equipo] Manejo de interrupciones:** Ante pérdida de red, el SDK intenta reconectar mientras la interfaz informa el estado real al usuario sin simular que la llamada sigue activa.
 9. **Cierre de sesión:** El usuario presiona salir, el cliente se desconecta de la sala y libera el acceso al micrófono.
 
----
 
 ## 3. Matriz de Requisitos Funcionales 
 
@@ -60,7 +58,6 @@ LiveKit es una infraestructura de código abierto para comunicaciones en tiempo 
 | **RF-05** | Por confirmar | Incorporar agente de voz y sus estados. | Agente IA | Audio publicado por el usuario | Respuesta de voz sintetizada del agente | El agente detecta turnos de habla, responde coherentemente y detiene su audio si el usuario lo interrumpe. | Proveedores externos de STT, LLM y TTS | [LiveKit Agents](https://docs.livekit.io/agents/) | **Nativo (Framework):** LiveKit provee el ciclo de turnos e interrupciones; **nosotros** programamos la lógica del agente y conectamos modelos. | ¿El caso de uso requiere IA o solo comunicación entre personas? ¿Qué proveedores se aprobarán? |
 | **RF-06** | Por confirmar | Llamadas telefónicas o transferencia. | Usuario / Operador | Llamada entrante o saliente PSTN | Audio bidireccional integrado en la sala | Se identifica dirección (entrante/saliente), destino y estado de la llamada telefónica dentro de la sesión. | Troncal SIP y proveedor VoIP externo | [LiveKit Telephony](https://docs.livekit.io/telephony/) | **Nativo (Módulo SIP):** LiveKit traduce SIP a WebRTC; **nosotros** contratamos el proveedor telefónico y configuramos reglas de enrutamiento. | ¿Se requieren llamadas a números reales? *(Nota: transferir una sala web no equivale a transferir una llamada telefónica)*. |
 
----
 
 ## 4. Matriz de Requisitos Técnicos y No Funcionales
 
@@ -75,7 +72,6 @@ LiveKit es una infraestructura de código abierto para comunicaciones en tiempo 
 | **Observabilidad** | Trazabilidad de sesiones, errores de conexión y eventos. | **Por acordar:** Uso del panel de analíticas/eventos en LiveKit Cloud o exportación de logs estructurados y métricas en despliegue propio para diagnosticar desconexiones. |
 | **Capacidad y Latencia** | Concurrencia máxima por sala y tiempos de respuesta aceptables. | **A acordar mediante pruebas:** No se fijan cifras teóricas. El equipo debe definir el número esperado de participantes simultáneos y ejecutar pruebas de carga antes de pasar a producción. |
 
----
 
 ## 5. Decisiones Pendientes y Alcance Mínimo Recomendado
 
@@ -98,7 +94,6 @@ LiveKit es una infraestructura de código abierto para comunicaciones en tiempo 
 * **Posponer para fases posteriores:**
   * Agentes de voz con IA (RF-05), integración telefónica SIP (RF-06) y grabación/transcripción de sesiones (Egress), hasta validar que el flujo base de audio funciona de forma estable.
 
----
 
 ## 6. Fuentes Consultadas
 
